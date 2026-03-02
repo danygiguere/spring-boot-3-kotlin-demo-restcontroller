@@ -47,6 +47,6 @@ class TeamController(
     ): Flow<Team> = teamService.findByEnterprise(enterpriseId)
 
     @GetMapping("/summary")
-    @Operation(summary = "List all teams with enterprise info (JOOQ join query)")
+    @Operation(summary = "List all teams with enterprise info")
     fun findSummary(): Flow<TeamSummary> = teamService.findTeamsWithEnterpriseInfo()
 }

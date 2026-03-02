@@ -4,15 +4,16 @@ import com.example.restcontrollerdemo.domain.entity.Team
 import com.example.restcontrollerdemo.dto.TeamRequest
 import com.example.restcontrollerdemo.dto.TeamSummary
 import com.example.restcontrollerdemo.exception.AppException
-import com.example.restcontrollerdemo.repository.TeamJooqRepository
+import com.example.restcontrollerdemo.repository.EnterpriseRepository
 import com.example.restcontrollerdemo.repository.TeamRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import org.springframework.stereotype.Service
 
 @Service
 class TeamService(
     private val teamRepository: TeamRepository,
-    private val teamJooqRepository: TeamJooqRepository,
+    private val enterpriseRepository: EnterpriseRepository,
 ) {
     suspend fun create(form: TeamRequest): Team {
         val team =
@@ -30,5 +31,17 @@ class TeamService(
 
     fun findByEnterprise(enterpriseId: Long): Flow<Team> = teamRepository.findAllByEnterpriseId(enterpriseId)
 
-    fun findTeamsWithEnterpriseInfo(): Flow<TeamSummary> = teamJooqRepository.findTeamsWithEnterpriseInfo()
+    fun findTeamsWithEnterpriseInfo(): Flow<TeamSummary> =
+        teamRepository.findAll().map { team ->
+            val enterprise =
+                enterpriseRepository.findById(team.enterpriseId)
+                    ?: throw AppException.NotFound("error.enterprise.not.found", team.enterpriseId)
+            TeamSummary(
+                teamId = team.id,
+                teamName = team.name,
+                teamDescription = team.description,
+                enterpriseName = enterprise.name,
+                enterpriseEmail = enterprise.email,
+            )
+        }
 }

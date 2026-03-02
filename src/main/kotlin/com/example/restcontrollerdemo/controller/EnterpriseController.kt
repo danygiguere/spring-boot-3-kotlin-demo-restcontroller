@@ -42,8 +42,8 @@ class EnterpriseController(
     fun findAll(): Flow<Enterprise> = enterpriseService.findAll()
 
     @GetMapping("/search")
-    @Operation(summary = "Search enterprises by name (JOOQ MULTISET query — includes teams and users)")
+    @Operation(summary = "Search enterprises by name (includes teams and users)")
     fun search(
         @RequestParam name: String,
-    ): Flow<EnterpriseWithTeams> = enterpriseService.searchByNameJooq(name)
+    ): Flow<EnterpriseWithTeams> = enterpriseService.searchByName(name)
 }
