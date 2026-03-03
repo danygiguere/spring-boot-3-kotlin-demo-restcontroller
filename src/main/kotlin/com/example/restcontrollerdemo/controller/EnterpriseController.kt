@@ -43,7 +43,7 @@ class EnterpriseController(
 
     @GetMapping("/search")
     @Operation(summary = "Search enterprises by name (includes teams and users)")
-    fun search(
+    suspend fun search(
         @RequestParam name: String,
-    ): Flow<EnterpriseWithTeams> = enterpriseService.searchByName(name)
+    ): List<EnterpriseWithTeams> = enterpriseService.searchByName(name)
 }

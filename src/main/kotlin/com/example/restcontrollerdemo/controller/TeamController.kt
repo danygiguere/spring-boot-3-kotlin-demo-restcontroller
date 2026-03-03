@@ -48,5 +48,5 @@ class TeamController(
 
     @GetMapping("/summary")
     @Operation(summary = "List all teams with enterprise info")
-    fun findSummary(): Flow<TeamSummary> = teamService.findTeamsWithEnterpriseInfo()
+    suspend fun findSummary(): List<TeamSummary> = teamService.findTeamsWithEnterpriseInfo()
 }
