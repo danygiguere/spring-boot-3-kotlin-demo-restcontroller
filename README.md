@@ -6,7 +6,7 @@ A demo project showcasing modern Spring Boot 3 development with Kotlin using the
 
 - **RestController (Annotation-based Routing)** — Routes defined via `@RestController`, `@GetMapping`, `@PostMapping` and other Spring MVC annotations
  using `CoroutineCrudRepository` for non-blocking persistence
-- **Global Exception Handler** — Centralized error handling with structured, consistent API error responses
+- **Global Exception Handler** — Centralized RFC 9457 Problem Details with localized validation errors and correlation IDs
 - **Swagger / OpenAPI** — Auto-generated interactive API documentation via Springdoc
 - **Hibernate Validation (i18n)** — Bean validation with localized constraint violation messages
 - **Spotless & Linting** — Automated code formatting and style enforcement
@@ -74,6 +74,5 @@ A Postman collection (`postman_collection.json`) is included at the root of the 
 | `./gradlew test` | Run tests |
 | `./gradlew spotlessApply` | Auto-format all source files |
 | `./gradlew spotlessCheck` | Check formatting without modifying files (CI) |
-
 
 

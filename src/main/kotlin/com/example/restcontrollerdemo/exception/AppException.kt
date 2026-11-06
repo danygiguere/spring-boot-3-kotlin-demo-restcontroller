@@ -1,31 +1,58 @@
 package com.example.restcontrollerdemo.exception
 
+import org.springframework.http.HttpStatus
+import org.springframework.http.ProblemDetail
+import org.springframework.web.ErrorResponseException
+import java.net.URI
+
 sealed class AppException(
+    status: HttpStatus,
     val messageKey: String,
-    val messageArgs: Array<out Any> = emptyArray(),
-) : RuntimeException(messageKey) {
+    args: Array<Any> = emptyArray(),
+    cause: Throwable? = null,
+) : ErrorResponseException(status, ProblemDetail.forStatus(status), cause, messageKey, args) {
+    init {
+        body.detail = messageKey
+        body.type = typeUri(messageKey)
+    }
+
     class NotFound(
         messageKey: String,
-        vararg args: Any,
-    ) : AppException(messageKey, args)
+        args: Array<Any> = emptyArray(),
+        cause: Throwable? = null,
+    ) : AppException(HttpStatus.NOT_FOUND, messageKey, args, cause)
 
     class Conflict(
         messageKey: String,
-        vararg args: Any,
-    ) : AppException(messageKey, args)
+        args: Array<Any> = emptyArray(),
+        cause: Throwable? = null,
+    ) : AppException(HttpStatus.CONFLICT, messageKey, args, cause)
 
     open class BadRequest(
         messageKey: String,
-        vararg args: Any,
-    ) : AppException(messageKey, args)
+        args: Array<Any> = emptyArray(),
+        cause: Throwable? = null,
+    ) : AppException(HttpStatus.BAD_REQUEST, messageKey, args, cause)
 
     class Unauthorized(
         messageKey: String,
-        vararg args: Any,
-    ) : AppException(messageKey, args)
+        args: Array<Any> = emptyArray(),
+        cause: Throwable? = null,
+    ) : AppException(HttpStatus.UNAUTHORIZED, messageKey, args, cause)
 
     class Forbidden(
         messageKey: String,
-        vararg args: Any,
-    ) : AppException(messageKey, args)
+        args: Array<Any> = emptyArray(),
+        cause: Throwable? = null,
+    ) : AppException(HttpStatus.FORBIDDEN, messageKey, args, cause)
+
+    class ValidationErrors(
+        val fieldErrors: Map<String, List<String>>,
+        summaryKey: String = "error.validation_failed",
+    ) : AppException(HttpStatus.UNPROCESSABLE_ENTITY, summaryKey)
+
+    companion object {
+        fun typeUri(messageKey: String): URI =
+            URI.create("/errors/" + messageKey.removePrefix("error.").replace('.', '-').replace('_', '-'))
+    }
 }

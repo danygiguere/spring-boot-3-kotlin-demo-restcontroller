@@ -1,20 +1,24 @@
 package com.example.restcontrollerdemo.exception
 
-import com.example.restcontrollerdemo.dto.ApiErrorResponse
+import com.example.restcontrollerdemo.filter.CorrelationIdFilter
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.validation.ConstraintViolationException
 import org.springframework.context.MessageSource
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
+import org.springframework.http.HttpStatusCode
 import org.springframework.http.MediaType
+import org.springframework.http.ProblemDetail
 import org.springframework.stereotype.Component
 import org.springframework.web.bind.support.WebExchangeBindException
+import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.server.ServerWebExchange
-import org.springframework.web.server.ServerWebInputException
 import org.springframework.web.server.WebExceptionHandler
 import reactor.core.publisher.Mono
+import java.net.URI
 import java.util.Locale
-import java.util.UUID
+import java.util.concurrent.CancellationException
 
 @Component
 @Order(-2)
@@ -24,116 +28,131 @@ class ApplicationExceptionHandler(
 ) : WebExceptionHandler {
     private val logger = KotlinLogging.logger {}
 
-    private fun correlationId() = UUID.randomUUID().toString()
-
-    private fun resolveMessage(
+    private fun logAppException(
         ex: AppException,
+        correlationId: String,
+    ) {
+        val label = "AppException.${ex::class.simpleName}"
+        if (ex.cause != null) {
+            logger.warn(ex) { "[$correlationId] $label: ${ex.messageKey}" }
+        } else {
+            logger.warn { "[$correlationId] $label: ${ex.messageKey}" }
+        }
+    }
+
+    private fun resolveStatusMessage(
+        status: HttpStatusCode,
         locale: Locale,
-    ): String = messageSource.getMessage(ex.messageKey, ex.messageArgs, ex.messageKey, locale) ?: ex.messageKey
+    ): String {
+        val fallback =
+            if (status.is4xxClientError) {
+                "The request could not be processed."
+            } else {
+                "An unexpected error occurred. Please try again later."
+            }
+        return messageSource.getMessage("error.${status.value()}", null, fallback, locale) ?: fallback
+    }
+
+    private fun problemOf(
+        status: HttpStatusCode,
+        detail: String,
+        errors: Map<String, List<String>>? = null,
+        typeKey: String? = null,
+    ): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(status, detail).apply {
+            typeKey?.let { type = AppException.typeUri(it) }
+            errors?.let { setProperty("errors", it) }
+        }
 
     override fun handle(
         exchange: ServerWebExchange,
         ex: Throwable,
     ): Mono<Void> {
-        val correlationId = correlationId()
+        val correlationId = CorrelationIdFilter.of(exchange)
+        val locale = exchange.localeContext.locale ?: Locale.ENGLISH
 
-        data class ErrorDetail(
-            val status: HttpStatus,
-            val message: String,
-            val errors: Map<String, List<String>>? = null,
-        )
-
-        val detail =
+        val problem =
             when (ex) {
-                // ===========================================
-                // Custom exceptions — messages are user-safe
-                // ===========================================
-
-                is AppException.Unauthorized -> {
-                    val locale = exchange.localeContext.locale ?: Locale.ENGLISH
-                    logger.warn { "[$correlationId] Unauthorized: ${ex.messageKey}" }
-                    ErrorDetail(HttpStatus.UNAUTHORIZED, resolveMessage(ex, locale))
+                is AppException.ValidationErrors -> {
+                    logAppException(ex, correlationId)
+                    val resolvedErrors =
+                        ex.fieldErrors.mapValues { (_, keys) ->
+                            keys.map { key -> messageSource.getMessage(key, null, key, locale) ?: key }
+                        }
+                    ex.updateAndGetBody(messageSource, locale).apply { setProperty("errors", resolvedErrors) }
                 }
 
-                is AppException.Forbidden -> {
-                    val locale = exchange.localeContext.locale ?: Locale.ENGLISH
-                    logger.warn { "[$correlationId] Forbidden: ${ex.messageKey}" }
-                    ErrorDetail(HttpStatus.FORBIDDEN, resolveMessage(ex, locale))
+                is AppException -> {
+                    logAppException(ex, correlationId)
+                    ex.updateAndGetBody(messageSource, locale)
                 }
 
-                is AppException.NotFound -> {
-                    val locale = exchange.localeContext.locale ?: Locale.ENGLISH
-                    logger.warn { "[$correlationId] NotFound: ${ex.messageKey}" }
-                    ErrorDetail(HttpStatus.NOT_FOUND, resolveMessage(ex, locale))
-                }
-
-                is AppException.Conflict -> {
-                    val locale = exchange.localeContext.locale ?: Locale.ENGLISH
-                    logger.warn { "[$correlationId] Conflict: ${ex.messageKey}" }
-                    ErrorDetail(HttpStatus.CONFLICT, resolveMessage(ex, locale))
-                }
-
-                is AppException.BadRequest -> {
-                    val locale = exchange.localeContext.locale ?: Locale.ENGLISH
-                    logger.warn { "[$correlationId] BadRequest: ${ex.messageKey}" }
-                    ErrorDetail(HttpStatus.BAD_REQUEST, resolveMessage(ex, locale))
-                }
-
-                // =====================================================================
-                // Framework/library exceptions — override messages with generic responses
-                // =====================================================================
-
-                is WebExchangeBindException -> {
-                    val locale = exchange.localeContext.locale ?: Locale.ENGLISH
-                    val summary = messageSource.getMessage("validation.failed", null, locale)
+                is ConstraintViolationException -> {
+                    val summary =
+                        messageSource.getMessage("error.validation_failed", null, "Validation failed", locale)
+                            ?: "Validation failed"
                     val fieldErrors =
-                        ex.bindingResult.fieldErrors
-                            .groupBy({ it.field }, { it.defaultMessage ?: "Invalid value" })
+                        ex.constraintViolations
+                            .groupBy({ it.propertyPath.toString() }, { it.message })
                     logger.warn {
                         "[$correlationId] Validation failed on ${exchange.request.method} ${exchange.request.path}: " +
                             fieldErrors.entries.joinToString(", ") { (field, messages) -> "$field: ${messages.joinToString("; ")}" }
                     }
-                    ErrorDetail(HttpStatus.UNPROCESSABLE_ENTITY, summary, fieldErrors)
+                    problemOf(HttpStatus.UNPROCESSABLE_ENTITY, summary, fieldErrors, "error.validation_failed")
                 }
 
-                is ServerWebInputException -> {
-                    logger.warn(ex) { "[$correlationId] ServerWebInputException: ${ex.reason}" }
-                    ErrorDetail(HttpStatus.BAD_REQUEST, "The request could not be processed.")
+                is WebExchangeBindException -> {
+                    val summary =
+                        messageSource.getMessage("error.validation_failed", null, "Validation failed", locale)
+                            ?: "Validation failed"
+                    val fieldErrors =
+                        ex.bindingResult.fieldErrors
+                            .groupBy({ it.field }, {
+                                messageSource.getMessage(it, locale)
+                                    ?: messageSource.getMessage("validation.invalid.value", null, "Invalid value", locale)
+                                    ?: "Invalid value"
+                            })
+                    logger.warn {
+                        "[$correlationId] Validation failed on ${exchange.request.method} ${exchange.request.path}: " +
+                            fieldErrors.entries.joinToString(", ") { (field, messages) -> "$field: ${messages.joinToString("; ")}" }
+                    }
+                    problemOf(HttpStatus.UNPROCESSABLE_ENTITY, summary, fieldErrors, "error.validation_failed")
                 }
 
-                is NoSuchElementException -> {
-                    logger.warn { "[$correlationId] NoSuchElementException: ${ex.message}" }
-                    ErrorDetail(HttpStatus.NOT_FOUND, "The requested resource was not found.")
+                is ResponseStatusException -> {
+                    if (ex.statusCode.is4xxClientError) {
+                        logger.warn { "[$correlationId] ${ex.javaClass.simpleName}: ${ex.reason}" }
+                        problemOf(ex.statusCode, resolveStatusMessage(ex.statusCode, locale))
+                    } else {
+                        logger.error(ex) { "[$correlationId] ${ex.javaClass.simpleName}: ${ex.reason}" }
+                        problemOf(
+                            HttpStatus.INTERNAL_SERVER_ERROR,
+                            resolveStatusMessage(HttpStatus.INTERNAL_SERVER_ERROR, locale),
+                        )
+                    }
                 }
 
-                is IllegalArgumentException -> {
-                    logger.warn(ex) { "[$correlationId] IllegalArgumentException: ${ex.message}" }
-                    ErrorDetail(HttpStatus.BAD_REQUEST, "The request could not be processed.")
-                }
-
-                is RuntimeException -> {
-                    logger.error(ex) { "[$correlationId] RuntimeException: ${ex.message}" }
-                    ErrorDetail(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred. Please try again later.")
-                }
+                is CancellationException -> return Mono.empty()
 
                 else -> {
-                    logger.error(ex) { "[$correlationId] Unhandled exception: ${ex.javaClass.simpleName} - ${ex.message}" }
-                    ErrorDetail(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred. Please try again later.")
+                    logger.error(ex) { "[$correlationId] ${ex.javaClass.simpleName}: ${ex.message}" }
+                    problemOf(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        resolveStatusMessage(HttpStatus.INTERNAL_SERVER_ERROR, locale),
+                    )
                 }
             }
 
-        val errorResponse =
-            ApiErrorResponse(
-                message = detail.message,
-                code = detail.status.name,
-                correlationId = correlationId,
-                errors = detail.errors,
-            )
+        if (problem.title.isNullOrBlank()) {
+            problem.title = HttpStatus.resolve(problem.status)?.reasonPhrase ?: "Error"
+        }
+        problem.instance = URI.create(exchange.request.path.value())
+        problem.setProperty("correlationId", correlationId)
 
-        exchange.response.statusCode = detail.status
-        exchange.response.headers.contentType = MediaType.APPLICATION_JSON
+        exchange.response.statusCode = HttpStatusCode.valueOf(problem.status)
+        exchange.response.headers.contentType = MediaType.APPLICATION_PROBLEM_JSON
 
-        val buffer = exchange.response.bufferFactory().wrap(objectMapper.writeValueAsBytes(errorResponse))
+        val buffer = exchange.response.bufferFactory().wrap(objectMapper.writeValueAsBytes(problem))
         return exchange.response.writeWith(Mono.just(buffer))
     }
 }
