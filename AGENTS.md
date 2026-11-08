@@ -16,7 +16,7 @@ Guidance for AI agents working in this repository. Read this before making chang
 
 Spring Boot 3 + Kotlin demo built on a **fully reactive** stack, using **annotated controllers** (`@RestController`)
 with `suspend` functions and `Flow`. Twin of `../spring-boot-3-kotlin-demo-corouter` and
-`../../Java/spring-boot-3-java-demo-restcontroller` (same API, schema, seed).
+`../spring-boot-3-java-webflux-demo-restcontroller` (same API, schema, seed).
 
 **Stack:** Kotlin 2.1 · JVM 21 · Spring Boot 3.5 · WebFlux + coroutines · Spring Security (OAuth2 resource server, JWT) · R2DBC · PostgreSQL ·
 Flyway · Springdoc/OpenAPI · Testcontainers

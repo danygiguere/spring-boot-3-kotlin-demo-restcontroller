@@ -6,10 +6,10 @@ as its twins — only the web layer differs:
 
 | | Functional routing | `@RestController` |
 |---|---|---|
-| Java (Mono/Flux) | [spring-boot-3-java-demo-router](../../Java/spring-boot-3-java-demo-router) | [spring-boot-3-java-demo-restcontroller](../../Java/spring-boot-3-java-demo-restcontroller) |
+| Java (Mono/Flux) | [spring-boot-3-java-webflux-demo-router](../spring-boot-3-java-webflux-demo-router) | [spring-boot-3-java-webflux-demo-restcontroller](../spring-boot-3-java-webflux-demo-restcontroller) |
 | Kotlin (coroutines) | [spring-boot-3-kotlin-demo-corouter](../spring-boot-3-kotlin-demo-corouter) | **this project** |
 
-Built on the domain of [spring-boot-java-audit-skills-demo](../../Java/spring-boot-java-audit-skills-demo), and written
+Built on the domain of [spring-boot-java-audit-skills-demo](../spring-boot-java-audit-skills-demo), and written
 to respect every invariant of [audit-skills](../../audit-skills) (see [AGENTS.md](AGENTS.md)).
 
 ## Features
