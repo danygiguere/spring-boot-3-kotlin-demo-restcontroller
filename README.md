@@ -28,6 +28,8 @@ to respect every invariant of [audit-skills](../../audit-skills) (see [AGENTS.md
 - **Bean Validation (i18n)** — `@Valid` bodies and constrained `@RequestParam`/`@PathVariable`/`@RequestHeader`
   (built-in method validation); messages re-interpolated in the request's locale (`ViolationMessages`); unknown JSON
   fields rejected; bounded pagination and body size
+- **Custom validators** — `@SafeText` (field-level: rejects HTML tags and control characters) and `@NoDuplicates`
+  (collection-level) in `validation/`, each a `ConstraintValidator` with localized messages; unit-tested without Spring
 - **Swagger / OpenAPI** — Springdoc infers parameters and response types from the signatures; bearer-token
   **Authorize** button (dev profile only)
 - **Spotless** — ktlint; a formatting violation fails the build
