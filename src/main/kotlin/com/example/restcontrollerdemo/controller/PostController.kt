@@ -6,6 +6,7 @@ import com.example.restcontrollerdemo.dto.PostDetails
 import com.example.restcontrollerdemo.dto.PostSummary
 import com.example.restcontrollerdemo.dto.UpdatePostRequest
 import com.example.restcontrollerdemo.dto.UserResponse
+import com.example.restcontrollerdemo.exception.AppException
 import com.example.restcontrollerdemo.security.AuthenticatedUser
 import com.example.restcontrollerdemo.service.PostService
 import io.swagger.v3.oas.annotations.Operation
@@ -13,7 +14,6 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.PositiveOrZero
 import kotlinx.coroutines.flow.Flow
@@ -61,13 +61,12 @@ class PostController(
     )
     suspend fun create(
         me: AuthenticatedUser,
-        @Parameter(example = "3f8a2c4e-9b1d-4e6f-a5c7-2d9e8b1f0a3c")
-        @RequestHeader(IDEMPOTENCY_KEY_HEADER)
-        @Pattern(regexp = "[A-Za-z0-9_-]{8,128}", message = "{idempotency.key.pattern}")
-        idempotencyKey: String,
+        @Parameter(required = true, example = "3f8a2c4e-9b1d-4e6f-a5c7-2d9e8b1f0a3c")
+        @RequestHeader(IDEMPOTENCY_KEY_HEADER, required = false)
+        idempotencyKey: String?,
         @Valid @RequestBody request: CreatePostRequest,
     ): ResponseEntity<PostDetails> {
-        val created = postService.create(me, idempotencyKey, request)
+        val created = postService.create(me, validIdempotencyKey(idempotencyKey), request)
         return ResponseEntity
             .created(URI.create("/posts/${created.post.id}"))
             .header(REPLAYED_HEADER, created.replayed.toString())
@@ -131,8 +130,16 @@ class PostController(
         @PathVariable @Positive(message = "{param.positive}") id: Long,
     ) = postService.unlike(me, id)
 
+    /** Required: without it, a retried or double-submitted create would publish the post twice. */
+    private fun validIdempotencyKey(key: String?): String {
+        if (key.isNullOrBlank()) throw AppException.BadRequest("error.header.required", arrayOf(IDEMPOTENCY_KEY_HEADER))
+        if (!IDEMPOTENCY_KEY.matches(key)) throw AppException.BadRequest("error.idempotency.key.invalid")
+        return key
+    }
+
     companion object {
         const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
+        private val IDEMPOTENCY_KEY = Regex("[A-Za-z0-9_-]{8,128}")
         const val REPLAYED_HEADER = "Idempotent-Replayed"
     }
 }

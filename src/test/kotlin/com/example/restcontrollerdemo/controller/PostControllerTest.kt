@@ -98,13 +98,11 @@ class PostControllerTest : IntegrationTest() {
             .isBadRequest
             .expectBody()
             .jsonPath("$.type")
-            .isEqualTo("/errors/param-invalid")
-            .jsonPath("$.errors['Idempotency-Key'][0]")
-            .isEqualTo("This parameter is required")
+            .isEqualTo("/errors/header-required")
     }
 
     @Test
-    fun `create - malformed idempotency key returns 422`() {
+    fun `create - malformed idempotency key returns 400`() {
         asUser(AUTHOR)
             .post()
             .uri("/posts")
@@ -112,10 +110,10 @@ class PostControllerTest : IntegrationTest() {
             .bodyValue(NEW_POST)
             .exchange()
             .expectStatus()
-            .isEqualTo(422)
+            .isBadRequest
             .expectBody()
-            .jsonPath("$.errors['Idempotency-Key'][0]")
-            .isEqualTo("Must be 8 to 128 characters: letters, digits, '-' or '_'")
+            .jsonPath("$.type")
+            .isEqualTo("/errors/idempotency-key-invalid")
     }
 
     @Test
@@ -142,7 +140,7 @@ class PostControllerTest : IntegrationTest() {
             .post()
             .uri("/posts")
             .header("Idempotency-Key", newKey())
-            .bodyValue(mapOf("content" to " ", "imageUrls" to List(11) { "https://images.example.com/x.jpg" }))
+            .bodyValue(mapOf("content" to " ", "imageUrls" to List(11) { "https://images.example.com/$it.jpg" }))
             .exchange()
             .expectStatus()
             .isEqualTo(422)
@@ -163,6 +161,22 @@ class PostControllerTest : IntegrationTest() {
             .expectBody()
             .jsonPath("$.errors['imageUrls[0]'][0]")
             .isEqualTo("Image URL must be a valid https URL")
+    }
+
+    @Test
+    fun `create - duplicate image urls return 422`() {
+        val url = "https://images.example.com/x.jpg"
+        asUser(AUTHOR)
+            .post()
+            .uri("/posts")
+            .header("Idempotency-Key", newKey())
+            .bodyValue(mapOf("content" to "ok", "imageUrls" to listOf(url, url)))
+            .exchange()
+            .expectStatus()
+            .isEqualTo(422)
+            .expectBody()
+            .jsonPath("$.errors.imageUrls[0]")
+            .isEqualTo("Image URLs must be unique")
     }
 
     @Test
