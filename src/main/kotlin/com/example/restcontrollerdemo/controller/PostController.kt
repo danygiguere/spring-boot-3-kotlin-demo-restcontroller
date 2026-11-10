@@ -35,19 +35,18 @@ import java.net.URI
 
 @RestController
 @RequestMapping("/posts")
-@Tag(name = "Posts", description = "Posts of the caller's enterprise; writes are restricted to the author")
+@Tag(name = "Posts", description = "Posts are visible to every user; writes are restricted to the author")
 class PostController(
     private val postService: PostService,
 ) {
     @GetMapping
-    @Operation(operationId = "getFeed", summary = "The enterprise feed, newest first (hasManyThrough)")
-    suspend fun feed(
-        me: AuthenticatedUser,
+    @Operation(operationId = "getFeed", summary = "The feed, newest first, with image and like counts")
+    fun feed(
         @RequestParam(required = false) @Positive(message = "{param.positive}") beforeId: Long?,
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): List<PostSummary> = postService.feed(me, Pagination.before(beforeId), limit)
+    ): Flow<PostSummary> = postService.feed(Pagination.before(beforeId), limit)
 
     /** Required key: without it, a retried or double-submitted create would publish the post twice. */
     @PostMapping
@@ -76,9 +75,8 @@ class PostController(
     @GetMapping("/{id}")
     @Operation(operationId = "getPostById", summary = "Get a post with its author, images and like count")
     suspend fun findById(
-        me: AuthenticatedUser,
         @PathVariable @Positive(message = "{param.positive}") id: Long,
-    ): PostDetails = postService.findById(me, id)
+    ): PostDetails = postService.findById(id)
 
     @PutMapping("/{id}")
     @Operation(operationId = "updatePost", summary = "Edit a post's content (author only)")
@@ -99,20 +97,18 @@ class PostController(
     @GetMapping("/{id}/images")
     @Operation(operationId = "getPostImages", summary = "List a post's images in display order (hasMany)")
     suspend fun findImages(
-        me: AuthenticatedUser,
         @PathVariable @Positive(message = "{param.positive}") id: Long,
-    ): Flow<ImageResponse> = postService.findImages(me, id)
+    ): Flow<ImageResponse> = postService.findImages(id)
 
     @GetMapping("/{id}/likes")
     @Operation(operationId = "getPostLikers", summary = "List users who like a post (manyToMany)")
     suspend fun findLikers(
-        me: AuthenticatedUser,
         @PathVariable @Positive(message = "{param.positive}") id: Long,
         @RequestParam(required = false) @PositiveOrZero(message = "{param.positiveOrZero}") afterId: Long?,
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): Flow<UserResponse> = postService.findLikers(me, id, Pagination.after(afterId), limit)
+    ): Flow<UserResponse> = postService.findLikers(id, Pagination.after(afterId), limit)
 
     @PutMapping("/{id}/likes")
     @ResponseStatus(HttpStatus.NO_CONTENT)

@@ -1,5 +1,6 @@
 package com.example.restcontrollerdemo.controller
 
+import com.example.restcontrollerdemo.dto.ImageResponse
 import com.example.restcontrollerdemo.dto.MeResponse
 import com.example.restcontrollerdemo.dto.PostSummary
 import com.example.restcontrollerdemo.dto.ProfileRequest
@@ -25,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/users")
-@Tag(name = "Users", description = "Users of the caller's enterprise only")
+@Tag(name = "Users")
 class UserController(
     private val userService: UserService,
     private val postService: PostService,
@@ -42,48 +43,53 @@ class UserController(
     ): ProfileResponse = userService.replaceMyProfile(me, request)
 
     @GetMapping
-    @Operation(operationId = "getUsers", summary = "List users of the caller's enterprise, oldest first")
+    @Operation(operationId = "getUsers", summary = "List users, oldest first")
     fun findAll(
-        me: AuthenticatedUser,
         @RequestParam(required = false) @PositiveOrZero(message = "{param.positiveOrZero}") afterId: Long?,
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): Flow<UserResponse> = userService.findAll(me, Pagination.after(afterId), limit)
+    ): Flow<UserResponse> = userService.findAll(Pagination.after(afterId), limit)
 
     @GetMapping("/{id}")
-    @Operation(operationId = "getUserById", summary = "Get a user of the caller's enterprise")
+    @Operation(operationId = "getUserById", summary = "Get a user (no email)")
     suspend fun findById(
-        me: AuthenticatedUser,
         @PathVariable @Positive(message = "{param.positive}") id: Long,
-    ): UserResponse = userService.findById(me, id)
+    ): UserResponse = userService.findById(id)
 
     @GetMapping("/{id}/profile")
     @Operation(operationId = "getUserProfile", summary = "Get a user's profile (hasOne)")
     suspend fun findProfile(
-        me: AuthenticatedUser,
         @PathVariable @Positive(message = "{param.positive}") id: Long,
-    ): ProfileResponse = userService.findProfile(me, id)
+    ): ProfileResponse = userService.findProfile(id)
 
     @GetMapping("/{id}/posts")
     @Operation(operationId = "getUserPosts", summary = "List a user's posts, newest first (hasMany)")
     suspend fun findPosts(
-        me: AuthenticatedUser,
         @PathVariable @Positive(message = "{param.positive}") id: Long,
         @RequestParam(required = false) @Positive(message = "{param.positive}") beforeId: Long?,
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): List<PostSummary> = postService.findByAuthor(me, id, Pagination.before(beforeId), limit)
+    ): Flow<PostSummary> = postService.findByAuthor(id, Pagination.before(beforeId), limit)
 
     @GetMapping("/{id}/liked-posts")
     @Operation(operationId = "getUserLikedPosts", summary = "List posts a user likes, newest first (manyToMany)")
     suspend fun findLikedPosts(
-        me: AuthenticatedUser,
         @PathVariable @Positive(message = "{param.positive}") id: Long,
         @RequestParam(required = false) @Positive(message = "{param.positive}") beforeId: Long?,
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): List<PostSummary> = postService.findLikedBy(me, id, Pagination.before(beforeId), limit)
+    ): Flow<PostSummary> = postService.findLikedBy(id, Pagination.before(beforeId), limit)
+
+    @GetMapping("/{id}/images")
+    @Operation(operationId = "getUserImages", summary = "List images of a user's posts, newest first (hasManyThrough)")
+    suspend fun findImages(
+        @PathVariable @Positive(message = "{param.positive}") id: Long,
+        @RequestParam(required = false) @Positive(message = "{param.positive}") beforeId: Long?,
+        @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
+        @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
+        limit: Int,
+    ): Flow<ImageResponse> = userService.findImages(id, Pagination.before(beforeId), limit)
 }
