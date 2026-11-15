@@ -1,5 +1,6 @@
 package com.example.restcontrollerdemo.controller
 
+import com.example.restcontrollerdemo.dto.CursorPage
 import com.example.restcontrollerdemo.dto.ImageResponse
 import com.example.restcontrollerdemo.dto.MeResponse
 import com.example.restcontrollerdemo.dto.PostSummary
@@ -10,11 +11,11 @@ import com.example.restcontrollerdemo.security.AuthenticatedUser
 import com.example.restcontrollerdemo.service.PostService
 import com.example.restcontrollerdemo.service.UserService
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.PositiveOrZero
-import kotlinx.coroutines.flow.Flow
 import org.hibernate.validator.constraints.Range
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -44,12 +45,15 @@ class UserController(
 
     @GetMapping
     @Operation(operationId = "getUsers", summary = "List users, oldest first")
-    fun findAll(
-        @RequestParam(required = false) @PositiveOrZero(message = "{param.positiveOrZero}") afterId: Long?,
+    suspend fun findAll(
+        @Parameter(description = Pagination.CURSOR_DESCRIPTION)
+        @RequestParam(required = false)
+        @PositiveOrZero(message = "{param.positiveOrZero}") cursor: Long?,
+        @Parameter(description = Pagination.LIMIT_DESCRIPTION)
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): Flow<UserResponse> = userService.findAll(Pagination.after(afterId), limit)
+    ): CursorPage<UserResponse> = userService.findAll(Pagination.after(cursor), limit)
 
     @GetMapping("/{id}")
     @Operation(operationId = "getUserById", summary = "Get a user (no email)")
@@ -67,29 +71,38 @@ class UserController(
     @Operation(operationId = "getUserPosts", summary = "List a user's posts, newest first (hasMany)")
     suspend fun findPosts(
         @PathVariable @Positive(message = "{param.positive}") id: Long,
-        @RequestParam(required = false) @Positive(message = "{param.positive}") beforeId: Long?,
+        @Parameter(description = Pagination.CURSOR_DESCRIPTION)
+        @RequestParam(required = false)
+        @Positive(message = "{param.positive}") cursor: Long?,
+        @Parameter(description = Pagination.LIMIT_DESCRIPTION)
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): Flow<PostSummary> = postService.findByAuthor(id, Pagination.before(beforeId), limit)
+    ): CursorPage<PostSummary> = postService.findByAuthor(id, Pagination.before(cursor), limit)
 
     @GetMapping("/{id}/liked-posts")
     @Operation(operationId = "getUserLikedPosts", summary = "List posts a user likes, newest first (manyToMany)")
     suspend fun findLikedPosts(
         @PathVariable @Positive(message = "{param.positive}") id: Long,
-        @RequestParam(required = false) @Positive(message = "{param.positive}") beforeId: Long?,
+        @Parameter(description = Pagination.CURSOR_DESCRIPTION)
+        @RequestParam(required = false)
+        @Positive(message = "{param.positive}") cursor: Long?,
+        @Parameter(description = Pagination.LIMIT_DESCRIPTION)
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): Flow<PostSummary> = postService.findLikedBy(id, Pagination.before(beforeId), limit)
+    ): CursorPage<PostSummary> = postService.findLikedBy(id, Pagination.before(cursor), limit)
 
     @GetMapping("/{id}/images")
     @Operation(operationId = "getUserImages", summary = "List images of a user's posts, newest first (hasManyThrough)")
     suspend fun findImages(
         @PathVariable @Positive(message = "{param.positive}") id: Long,
-        @RequestParam(required = false) @Positive(message = "{param.positive}") beforeId: Long?,
+        @Parameter(description = Pagination.CURSOR_DESCRIPTION)
+        @RequestParam(required = false)
+        @Positive(message = "{param.positive}") cursor: Long?,
+        @Parameter(description = Pagination.LIMIT_DESCRIPTION)
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): Flow<ImageResponse> = userService.findImages(id, Pagination.before(beforeId), limit)
+    ): CursorPage<ImageResponse> = userService.findImages(id, Pagination.before(cursor), limit)
 }

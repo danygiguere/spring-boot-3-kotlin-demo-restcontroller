@@ -4,9 +4,11 @@ import com.example.restcontrollerdemo.domain.entity.IdempotencyKey
 import com.example.restcontrollerdemo.domain.entity.Image
 import com.example.restcontrollerdemo.domain.entity.Post
 import com.example.restcontrollerdemo.dto.CreatePostRequest
+import com.example.restcontrollerdemo.dto.CursorPage
 import com.example.restcontrollerdemo.dto.ImageResponse
 import com.example.restcontrollerdemo.dto.PostDetails
 import com.example.restcontrollerdemo.dto.PostSummary
+import com.example.restcontrollerdemo.dto.PostSummaryRow
 import com.example.restcontrollerdemo.dto.UpdatePostRequest
 import com.example.restcontrollerdemo.dto.UserResponse
 import com.example.restcontrollerdemo.error.ConflictException
@@ -54,28 +56,27 @@ class PostService(
 ) {
     // --- Reads --------------------------------------------------------------------------------------------------
 
-    fun feed(
-        beforeId: Long,
+    suspend fun feed(
+        cursor: Long,
         limit: Int,
-    ): Flow<PostSummary> = postRepository.findFeed(beforeId, limit).map(::PostSummary)
+    ): CursorPage<PostSummary> = summaries(postRepository.findFeed(cursor, limit + 1), limit)
 
-    /** The existence check runs before the [Flow] is returned, so a 404 is raised before any byte is written. */
     suspend fun findByAuthor(
         userId: Long,
-        beforeId: Long,
+        cursor: Long,
         limit: Int,
-    ): Flow<PostSummary> {
+    ): CursorPage<PostSummary> {
         userService.requireUser(userId)
-        return postRepository.findByAuthor(userId, beforeId, limit).map(::PostSummary)
+        return summaries(postRepository.findByAuthor(userId, cursor, limit + 1), limit)
     }
 
     suspend fun findLikedBy(
         userId: Long,
-        beforeId: Long,
+        cursor: Long,
         limit: Int,
-    ): Flow<PostSummary> {
+    ): CursorPage<PostSummary> {
         userService.requireUser(userId)
-        return postRepository.findLikedBy(userId, beforeId, limit).map(::PostSummary)
+        return summaries(postRepository.findLikedBy(userId, cursor, limit + 1), limit)
     }
 
     /** The post, its author, images and like count: three independent queries run concurrently. */
@@ -97,11 +98,11 @@ class PostService(
 
     suspend fun findLikers(
         id: Long,
-        afterId: Long,
+        cursor: Long,
         limit: Int,
-    ): Flow<UserResponse> {
+    ): CursorPage<UserResponse> {
         requirePost(id)
-        return userRepository.findLikers(id, afterId, limit).map(::UserResponse)
+        return CursorPage.of(userRepository.findLikers(id, cursor, limit + 1).map(::UserResponse).toList(), limit) { it.id }
     }
 
     // --- Writes -------------------------------------------------------------------------------------------------
@@ -184,6 +185,11 @@ class PostService(
     }
 
     // --- Helpers ------------------------------------------------------------------------------------------------
+
+    private suspend fun summaries(
+        rows: Flow<PostSummaryRow>,
+        limit: Int,
+    ): CursorPage<PostSummary> = CursorPage.of(rows.map(::PostSummary).toList(), limit) { it.id }
 
     private suspend fun insertPost(
         me: AuthenticatedUser,

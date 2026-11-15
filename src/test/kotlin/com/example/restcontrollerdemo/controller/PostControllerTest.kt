@@ -1,5 +1,6 @@
 package com.example.restcontrollerdemo.controller
 
+import com.example.restcontrollerdemo.dto.CursorPage
 import com.example.restcontrollerdemo.dto.PostDetails
 import com.example.restcontrollerdemo.dto.PostSummary
 import com.example.restcontrollerdemo.support.IntegrationTest
@@ -9,7 +10,6 @@ import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.reactive.server.WebTestClient
 import org.springframework.test.web.reactive.server.expectBody
-import org.springframework.test.web.reactive.server.expectBodyList
 import java.util.UUID
 
 class PostControllerTest : IntegrationTest() {
@@ -309,8 +309,10 @@ class PostControllerTest : IntegrationTest() {
             .expectStatus()
             .isOk
             .expectBody()
-            .jsonPath("$[*].id")
+            .jsonPath("$.data[*].id")
             .isEqualTo(listOf(4))
+            .jsonPath("$.nextCursor")
+            .isEmpty
 
         repeat(2) {
             user
@@ -349,21 +351,65 @@ class PostControllerTest : IntegrationTest() {
         // Post p has (p % 4) images and (p % 7) likes in the seed.
         asUser(ALICE)
             .get()
-            .uri("/posts?beforeId=8&limit=3")
+            .uri("/posts?cursor=8&limit=3")
             .exchange()
             .expectStatus()
             .isOk
             .expectBody()
-            .jsonPath("$[*].id")
+            .jsonPath("$.data[*].id")
             .isEqualTo(listOf(7, 6, 5))
-            .jsonPath("$[0].imageCount")
+            .jsonPath("$.nextCursor")
+            .isEqualTo(5)
+            .jsonPath("$.data[0].imageCount")
             .isEqualTo(3)
-            .jsonPath("$[0].likeCount")
+            .jsonPath("$.data[0].likeCount")
             .isEqualTo(0)
-            .jsonPath("$[1].likeCount")
+            .jsonPath("$.data[1].likeCount")
             .isEqualTo(6)
-            .jsonPath("$[2].author.name")
+            .jsonPath("$.data[2].author.name")
             .isEqualTo("Bob")
+    }
+
+    @Test
+    fun `feed - last page has no next cursor`() {
+        // Posts 1 to 3 are below the cursor: an exactly full page, and a short one, both end the list.
+        asUser(ALICE)
+            .get()
+            .uri("/posts?cursor=4&limit=3")
+            .exchange()
+            .expectStatus()
+            .isOk
+            .expectBody()
+            .jsonPath("$.data[*].id")
+            .isEqualTo(listOf(3, 2, 1))
+            .jsonPath("$.nextCursor")
+            .isEmpty
+        asUser(ALICE)
+            .get()
+            .uri("/posts?cursor=3&limit=3")
+            .exchange()
+            .expectStatus()
+            .isOk
+            .expectBody()
+            .jsonPath("$.data[*].id")
+            .isEqualTo(listOf(2, 1))
+            .jsonPath("$.nextCursor")
+            .isEmpty
+    }
+
+    @Test
+    fun `feed - rejects a non-positive cursor`() {
+        asUser(ALICE)
+            .get()
+            .uri("/posts?cursor=0")
+            .exchange()
+            .expectStatus()
+            .isBadRequest
+            .expectBody()
+            .jsonPath("$.code")
+            .isEqualTo("error.validation")
+            .jsonPath("$.errors[?(@.field == 'cursor')]")
+            .exists()
     }
 
     @Test
@@ -371,15 +417,15 @@ class PostControllerTest : IntegrationTest() {
         val page =
             asUser(ALICE)
                 .get()
-                .uri("/posts?beforeId=6&limit=3")
+                .uri("/posts?cursor=6&limit=3")
                 .exchange()
                 .expectStatus()
                 .isOk
-                .expectBodyList<PostSummary>()
+                .expectBody<CursorPage<PostSummary>>()
                 .returnResult()
                 .responseBody!!
 
-        assertThat(page.map { it.id to it.author.name }).containsExactly(5L to "Bob", 4L to "Alice", 3L to "Alice")
+        assertThat(page.data.map { it.id to it.author.name }).containsExactly(5L to "Bob", 4L to "Alice", 3L to "Alice")
     }
 
     @Test

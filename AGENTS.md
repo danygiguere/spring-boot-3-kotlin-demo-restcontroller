@@ -54,7 +54,7 @@ Controller (@RestController + OpenAPI, validation)  →  Service (business logic
 ```
 
 - **Controller** (`controller/`) — `@RestController` with `suspend fun` returning the DTO (or `ResponseEntity<Dto>`
-  when headers are needed) and `Flow<Dto>` for streams. Takes the caller as a `me: AuthenticatedUser` parameter
+  when headers are needed) and `Flow<Dto>` for streams, `CursorPage<Dto>` for paginated lists. Takes the caller as a `me: AuthenticatedUser` parameter
   (`AuthenticatedUserArgumentResolver`; hidden from OpenAPI). Bodies use `@Valid @RequestBody`; params carry
   constraints with an explicit `message` key (`@Positive(message = "{param.positive}")`). No business logic.
 - **Service** (`service/`) — `@Service`. Business logic and permission checks. `suspend` functions
@@ -66,7 +66,9 @@ Controller (@RestController + OpenAPI, validation)  →  Service (business logic
 - **Entity** (`domain/entity/`) — `data class` with `@Table` and `@Id val id: Long? = null`. Never serialized.
 - **DTO** (`dto/`) — request classes (nullable fields + `@field:` constraints, explicit writable fields; element
   constraints like `List<@URL String>` rely on `-Xemit-jvm-type-annotations`) and response classes (explicit exposed
-  fields). No response envelope; lists are JSON arrays with keyset pagination.
+  fields). Unpaginated lists are JSON arrays; paginated lists are `CursorPage<T>` (`data`, `nextCursor`, null on
+  the last page) with keyset pagination: one `cursor` parameter, the service fetches `limit + 1` rows and
+  `CursorPage.of` trims the extra one.
 
 Coroutine rules: never `runBlocking` in main code; independent reads use `coroutineScope { async { } }`; a list page
 and its related data (author, counts) come from one query into a flat row (`PostSummaryRow`). Inside a transaction,

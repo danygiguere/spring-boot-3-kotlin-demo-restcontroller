@@ -1,6 +1,7 @@
 package com.example.restcontrollerdemo.service
 
 import com.example.restcontrollerdemo.domain.entity.User
+import com.example.restcontrollerdemo.dto.CursorPage
 import com.example.restcontrollerdemo.dto.ImageResponse
 import com.example.restcontrollerdemo.dto.MeResponse
 import com.example.restcontrollerdemo.dto.ProfileRequest
@@ -13,6 +14,7 @@ import com.example.restcontrollerdemo.repository.UserRepository
 import com.example.restcontrollerdemo.security.AuthenticatedUser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
 import org.springframework.stereotype.Service
 
 @Service
@@ -23,10 +25,10 @@ class UserService(
 ) {
     suspend fun me(me: AuthenticatedUser): MeResponse = MeResponse(requireUser(me.userId))
 
-    fun findAll(
-        afterId: Long,
+    suspend fun findAll(
+        cursor: Long,
         limit: Int,
-    ): Flow<UserResponse> = userRepository.findPage(afterId, limit).map(::UserResponse)
+    ): CursorPage<UserResponse> = CursorPage.of(userRepository.findPage(cursor, limit + 1).map(::UserResponse).toList(), limit) { it.id }
 
     suspend fun findById(id: Long): UserResponse = UserResponse(requireUser(id))
 
@@ -50,11 +52,11 @@ class UserService(
     /** The existence check runs before the [Flow] is returned, so a 404 is raised before any byte is written. */
     suspend fun findImages(
         userId: Long,
-        beforeId: Long,
+        cursor: Long,
         limit: Int,
-    ): Flow<ImageResponse> {
+    ): CursorPage<ImageResponse> {
         requireUser(userId)
-        return imageRepository.findByUser(userId, beforeId, limit).map(::ImageResponse)
+        return CursorPage.of(imageRepository.findByUser(userId, cursor, limit + 1).map(::ImageResponse).toList(), limit) { it.id }
     }
 
     suspend fun requireUser(userId: Long): User =

@@ -42,6 +42,19 @@ class OpenApiTest : IntegrationTest() {
             // Inferred from the signature `suspend fun findById(...): PostDetails`, no annotation needed.
             .jsonPath("$.paths['/posts/{id}'].get.responses['200'].content['*/*'].schema['\$ref']")
             .isEqualTo("#/components/schemas/PostDetails")
+            // Lists are cursor pages: one documented `cursor` parameter, no per-direction id parameters.
+            .jsonPath("$.paths['/posts'].get.responses['200'].content['*/*'].schema['\$ref']")
+            .isEqualTo("#/components/schemas/CursorPagePostSummary")
+            .jsonPath("$.paths['/posts'].get.parameters[?(@.name == 'cursor')].description")
+            .isNotEmpty
+            .jsonPath("$.paths['/users'].get.parameters[?(@.name == 'cursor')]")
+            .exists()
+            .jsonPath("$.paths['/users'].get.parameters[?(@.name == 'afterId')]")
+            .isEmpty
+            .jsonPath("$.paths['/posts'].get.parameters[?(@.name == 'beforeId')]")
+            .isEmpty
+            .jsonPath("$.components.schemas.CursorPagePostSummary.properties.nextCursor")
+            .exists()
             // AuthenticatedUser comes from the token: not documented as a parameter.
             .jsonPath("$.paths['/users/me'].get.parameters")
             .doesNotExist()

@@ -1,6 +1,7 @@
 package com.example.restcontrollerdemo.controller
 
 import com.example.restcontrollerdemo.dto.CreatePostRequest
+import com.example.restcontrollerdemo.dto.CursorPage
 import com.example.restcontrollerdemo.dto.ImageResponse
 import com.example.restcontrollerdemo.dto.PostDetails
 import com.example.restcontrollerdemo.dto.PostSummary
@@ -41,12 +42,15 @@ class PostController(
 ) {
     @GetMapping
     @Operation(operationId = "getFeed", summary = "The feed, newest first, with image and like counts")
-    fun feed(
-        @RequestParam(required = false) @Positive(message = "{param.positive}") beforeId: Long?,
+    suspend fun feed(
+        @Parameter(description = Pagination.CURSOR_DESCRIPTION)
+        @RequestParam(required = false)
+        @Positive(message = "{param.positive}") cursor: Long?,
+        @Parameter(description = Pagination.LIMIT_DESCRIPTION)
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): Flow<PostSummary> = postService.feed(Pagination.before(beforeId), limit)
+    ): CursorPage<PostSummary> = postService.feed(Pagination.before(cursor), limit)
 
     /** Required key: without it, a retried or double-submitted create would publish the post twice. */
     @PostMapping
@@ -104,11 +108,14 @@ class PostController(
     @Operation(operationId = "getPostLikers", summary = "List users who like a post (manyToMany)")
     suspend fun findLikers(
         @PathVariable @Positive(message = "{param.positive}") id: Long,
-        @RequestParam(required = false) @PositiveOrZero(message = "{param.positiveOrZero}") afterId: Long?,
+        @Parameter(description = Pagination.CURSOR_DESCRIPTION)
+        @RequestParam(required = false)
+        @PositiveOrZero(message = "{param.positiveOrZero}") cursor: Long?,
+        @Parameter(description = Pagination.LIMIT_DESCRIPTION)
         @RequestParam(defaultValue = Pagination.DEFAULT_LIMIT)
         @Range(min = 1, max = Pagination.MAX_LIMIT, message = "{param.limit.range}")
         limit: Int,
-    ): Flow<UserResponse> = postService.findLikers(id, Pagination.after(afterId), limit)
+    ): CursorPage<UserResponse> = postService.findLikers(id, Pagination.after(cursor), limit)
 
     @PutMapping("/{id}/likes")
     @ResponseStatus(HttpStatus.NO_CONTENT)
