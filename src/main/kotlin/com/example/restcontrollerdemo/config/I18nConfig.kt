@@ -13,7 +13,7 @@ import org.springframework.web.server.i18n.AcceptHeaderLocaleContextResolver
 import org.springframework.web.server.i18n.LocaleContextResolver
 import java.util.Locale
 
-/** English by default; `Accept-Language: fr` for French. */
+/** English by default; `Accept-Language: fr` (or `fr-CA`) for French. Other languages fall back to English. */
 @Configuration
 class I18nConfig {
     @Bean
@@ -38,11 +38,12 @@ class I18nConfig {
     @Bean
     fun localeContextResolver(): LocaleContextResolver =
         AcceptHeaderLocaleContextResolver().apply {
+            supportedLocales = listOf(Locale.ENGLISH, Locale.FRENCH)
             defaultLocale = Locale.ENGLISH
         }
 }
 
-/** Interpolates in the given locale; see `ViolationMessages` for the request locale. */
+/** Interpolates in the given locale; see `ValidationErrorTranslator` for the request locale. */
 private class LocaleAwareMessageInterpolator(
     private val delegate: MessageInterpolator,
 ) : MessageInterpolator {

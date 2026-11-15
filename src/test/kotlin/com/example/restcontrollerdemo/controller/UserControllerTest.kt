@@ -1,6 +1,7 @@
 package com.example.restcontrollerdemo.controller
 
 import com.example.restcontrollerdemo.support.IntegrationTest
+import org.hamcrest.Matchers.hasItem
 import org.junit.jupiter.api.Test
 
 class UserControllerTest : IntegrationTest() {
@@ -46,12 +47,12 @@ class UserControllerTest : IntegrationTest() {
             .uri("/users?limit=500")
             .exchange()
             .expectStatus()
-            .isEqualTo(422)
+            .isBadRequest
             .expectBody()
-            .jsonPath("$.type")
-            .isEqualTo("/errors/validation-failed")
-            .jsonPath("$.errors.limit[0]")
-            .isEqualTo("Must be between 1 and 100")
+            .jsonPath("$.code")
+            .isEqualTo("error.validation")
+            .jsonPath("$.errors[?(@.field == 'limit')].message")
+            .value(hasItem("Must be between 1 and 100"))
     }
 
     @Test
@@ -64,10 +65,10 @@ class UserControllerTest : IntegrationTest() {
             .expectStatus()
             .isNotFound
             .expectBody()
-            .jsonPath("$.type")
-            .isEqualTo("/errors/user-not-found")
+            .jsonPath("$.code")
+            .isEqualTo("error.user.notFound")
             .jsonPath("$.detail")
-            .isEqualTo("Utilisateur 999999 introuvable")
+            .isEqualTo("Utilisateur 999999 introuvable.")
             .jsonPath("$.instance")
             .isEqualTo("/users/999999")
     }
@@ -81,10 +82,10 @@ class UserControllerTest : IntegrationTest() {
             .expectStatus()
             .isBadRequest
             .expectBody()
-            .jsonPath("$.type")
-            .isEqualTo("/errors/param-invalid")
-            .jsonPath("$.errors.id[0]")
-            .isEqualTo("This parameter has an invalid format")
+            .jsonPath("$.code")
+            .isEqualTo("error.request.typeMismatch")
+            .jsonPath("$.detail")
+            .isEqualTo("The value of ‘id’ has an invalid format.")
     }
 
     @Test
@@ -130,12 +131,12 @@ class UserControllerTest : IntegrationTest() {
             .bodyValue(mapOf("avatarUrl" to "javascript:alert(1)"))
             .exchange()
             .expectStatus()
-            .isEqualTo(422)
+            .isBadRequest
             .expectBody()
-            .jsonPath("$.type")
-            .isEqualTo("/errors/validation-failed")
-            .jsonPath("$.errors.avatarUrl[0]")
-            .isEqualTo("L'URL de l'avatar doit être une URL https valide")
+            .jsonPath("$.code")
+            .isEqualTo("error.validation")
+            .jsonPath("$.errors[?(@.field == 'avatarUrl')].message")
+            .value(hasItem("L’URL de l’avatar doit être une URL https valide"))
     }
 
     @Test
@@ -173,8 +174,8 @@ class UserControllerTest : IntegrationTest() {
             .expectStatus()
             .isNotFound
             .expectBody()
-            .jsonPath("$.type")
-            .isEqualTo("/errors/user-not-found")
+            .jsonPath("$.code")
+            .isEqualTo("error.user.notFound")
     }
 
     @Test
@@ -202,7 +203,7 @@ class UserControllerTest : IntegrationTest() {
             .expectStatus()
             .isNotFound
             .expectBody()
-            .jsonPath("$.type")
-            .isEqualTo("/errors/user-not-found")
+            .jsonPath("$.code")
+            .isEqualTo("error.user.notFound")
     }
 }

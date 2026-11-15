@@ -9,7 +9,9 @@ import com.example.restcontrollerdemo.dto.PostDetails
 import com.example.restcontrollerdemo.dto.PostSummary
 import com.example.restcontrollerdemo.dto.UpdatePostRequest
 import com.example.restcontrollerdemo.dto.UserResponse
-import com.example.restcontrollerdemo.exception.AppException
+import com.example.restcontrollerdemo.error.ConflictException
+import com.example.restcontrollerdemo.error.ForbiddenException
+import com.example.restcontrollerdemo.error.NotFoundException
 import com.example.restcontrollerdemo.repository.IdempotencyKeyRepository
 import com.example.restcontrollerdemo.repository.ImageRepository
 import com.example.restcontrollerdemo.repository.PostLikeRepository
@@ -168,7 +170,7 @@ class PostService(
             postLikeRepository.likeIfAbsent(id, me.userId)
         } catch (e: DataIntegrityViolationException) {
             // The post was deleted between the existence check and the insert (foreign key violation).
-            throw AppException.NotFound("error.post.not.found", arrayOf(id), e)
+            throw NotFoundException("error.post.notFound", listOf(id), "Post deleted before like insert", e)
         }
     }
 
@@ -205,7 +207,11 @@ class PostService(
         id: Long,
     ): Post =
         requirePost(id).also {
-            if (it.userId != me.userId) throw AppException.Forbidden("error.post.not.author", arrayOf(id))
+            if (it.userId !=
+                me.userId
+            ) {
+                throw ForbiddenException("error.post.notAuthor", listOf(id), "User ${me.userId} is not the author of post $id")
+            }
         }
 
     /** What the transaction of [create] did with the Idempotency-Key. */
@@ -220,14 +226,14 @@ class PostService(
     }
 
     private companion object {
-        fun postNotFound(id: Long) = AppException.NotFound("error.post.not.found", arrayOf(id))
+        fun postNotFound(id: Long) = NotFoundException("error.post.notFound", listOf(id))
 
         fun replayedPostId(
             existing: IdempotencyKey,
             requestHash: String,
         ): Long {
-            if (existing.requestHash != requestHash) throw AppException.Conflict("error.idempotency.key.reused")
-            return existing.postId ?: throw AppException.Conflict("error.idempotency.key.gone")
+            if (existing.requestHash != requestHash) throw ConflictException("error.idempotencyKey.reused")
+            return existing.postId ?: throw ConflictException("error.idempotencyKey.gone")
         }
 
         /** Length-prefixed fields, so two different requests can never produce the same input. */

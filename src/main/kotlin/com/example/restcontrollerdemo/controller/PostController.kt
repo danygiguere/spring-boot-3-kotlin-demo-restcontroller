@@ -6,7 +6,7 @@ import com.example.restcontrollerdemo.dto.PostDetails
 import com.example.restcontrollerdemo.dto.PostSummary
 import com.example.restcontrollerdemo.dto.UpdatePostRequest
 import com.example.restcontrollerdemo.dto.UserResponse
-import com.example.restcontrollerdemo.exception.AppException
+import com.example.restcontrollerdemo.error.BadRequestException
 import com.example.restcontrollerdemo.security.AuthenticatedUser
 import com.example.restcontrollerdemo.service.PostService
 import io.swagger.v3.oas.annotations.Operation
@@ -128,8 +128,8 @@ class PostController(
 
     /** Required: without it, a retried or double-submitted create would publish the post twice. */
     private fun validIdempotencyKey(key: String?): String {
-        if (key.isNullOrBlank()) throw AppException.BadRequest("error.header.required", arrayOf(IDEMPOTENCY_KEY_HEADER))
-        if (!IDEMPOTENCY_KEY.matches(key)) throw AppException.BadRequest("error.idempotency.key.invalid")
+        if (key.isNullOrBlank()) throw BadRequestException("error.request.missingHeader", listOf(IDEMPOTENCY_KEY_HEADER))
+        if (!IDEMPOTENCY_KEY.matches(key)) throw BadRequestException("error.idempotencyKey.invalid")
         return key
     }
 

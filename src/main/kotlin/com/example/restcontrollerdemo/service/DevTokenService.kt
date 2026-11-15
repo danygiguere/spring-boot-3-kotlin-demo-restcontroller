@@ -1,7 +1,7 @@
 package com.example.restcontrollerdemo.service
 
 import com.example.restcontrollerdemo.dto.TokenResponse
-import com.example.restcontrollerdemo.exception.AppException
+import com.example.restcontrollerdemo.error.UnauthenticatedException
 import com.example.restcontrollerdemo.repository.UserRepository
 import com.example.restcontrollerdemo.security.DevTokenEnabled
 import com.example.restcontrollerdemo.security.DevTokenIssuer
@@ -16,5 +16,5 @@ class DevTokenService(
 ) {
     suspend fun issue(email: String): TokenResponse =
         userRepository.findByEmail(email)?.let(issuer::issue)
-            ?: throw AppException.Unauthorized("error.auth.invalid")
+            ?: throw UnauthenticatedException("error.auth.invalid", internalMessage = "No user with this email")
 }

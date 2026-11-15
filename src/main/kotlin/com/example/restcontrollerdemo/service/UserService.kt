@@ -6,7 +6,7 @@ import com.example.restcontrollerdemo.dto.MeResponse
 import com.example.restcontrollerdemo.dto.ProfileRequest
 import com.example.restcontrollerdemo.dto.ProfileResponse
 import com.example.restcontrollerdemo.dto.UserResponse
-import com.example.restcontrollerdemo.exception.AppException
+import com.example.restcontrollerdemo.error.NotFoundException
 import com.example.restcontrollerdemo.repository.ImageRepository
 import com.example.restcontrollerdemo.repository.ProfileRepository
 import com.example.restcontrollerdemo.repository.UserRepository
@@ -34,7 +34,7 @@ class UserService(
         val user = requireUser(userId)
         val profile =
             profileRepository.findByUserId(user.id!!)
-                ?: throw AppException.NotFound("error.profile.not.found", arrayOf(userId))
+                ?: throw NotFoundException("error.profile.notFound", listOf(userId))
         return ProfileResponse(profile)
     }
 
@@ -58,5 +58,5 @@ class UserService(
     }
 
     suspend fun requireUser(userId: Long): User =
-        userRepository.findById(userId) ?: throw AppException.NotFound("error.user.not.found", arrayOf(userId))
+        userRepository.findById(userId) ?: throw NotFoundException("error.user.notFound", listOf(userId))
 }

@@ -23,11 +23,12 @@ to respect every invariant of [audit-skills](../../audit-skills) (see [AGENTS.md
 - **JWT resource server** — HS256 pinned; `exp`, `iss`, `aud` and claim shapes validated; deny-by-default routes
 - **Ownership** — writes are restricted to the owner, taken from the verified token, never from the request
 - **Idempotent writes** — required `Idempotency-Key` on post creation; likes and profile upserts are naturally idempotent
-- **Global exception handler** — RFC 9457 problem details (`application/problem+json`) with a stable `type`, a
-  localized `detail` and a `correlationId` matching the `X-Correlation-Id` header; only `AppException` messages reach
-  the client
+- **Global exception handler** — RFC 9457 problem details (`application/problem+json`) with a stable `code`, a
+  localized `title` and `detail`, and a `correlationId` matching the `X-Correlation-ID` header (an incoming one is
+  reused when safe). Exception messages never reach the client: each failure is logged once with the correlation ID,
+  and 5xx failures are passed to every `ErrorReporter` bean (Sentry, …). Code in `error/`
 - **Bean Validation (i18n)** — `@Valid` bodies and constrained `@RequestParam`/`@PathVariable`/`@RequestHeader`
-  (built-in method validation); messages re-interpolated in the request's locale (`ViolationMessages`); unknown JSON
+  (built-in method validation); messages re-interpolated in the request's locale (`ValidationErrorTranslator`); unknown JSON
   fields rejected; bounded pagination and body size
 - **Custom validators** — `@SafeText` (field-level: rejects HTML tags and control characters) and `@NoDuplicates`
   (collection-level) in `validation/`, each a `ConstraintValidator` with localized messages; unit-tested without Spring
@@ -102,8 +103,9 @@ readable by every user; a missing one answers **404**, a write by someone other 
 | `GET` | `/posts/{id}/likes?afterId=&limit=` | Users who like the post |
 | `PUT` / `DELETE` | `/posts/{id}/likes` | Like / unlike as the caller (idempotent, 204) |
 
-Errors: **400** `/errors/param-invalid` when a parameter is missing or mistyped; **422** `/errors/validation-failed`
-when a body field or parameter breaks a constraint. Both carry `errors` keyed by field or parameter name.
+Errors: **400** `error.validation` when a body field or parameter breaks a constraint, with `errors` as a list of
+`{field, code, message}`; **400** `error.request.typeMismatch`, `error.request.missingParameter` or
+`error.request.missingHeader` when a parameter is mistyped or missing.
 
 Lists use keyset pagination: pass the last `id` of a page as `beforeId` (newest-first lists) or `afterId`
 (oldest-first lists). `limit` defaults to 20, max 100.
